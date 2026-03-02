@@ -1,16 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
-//#define GLEW_STATIC
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 using namespace std;
 
-///////////////////////////////////////////////////////////////////////////////
-//                 Some Callbacks to be implemented later                    //
-///////////////////////////////////////////////////////////////////////////////
+// @todo implement remaining callbacks later
 struct Interface
 {
-    static void * app; // <-- an unknown application to be defined later
+    static void * app; // an unknown application to be defined later
     
     template<class APPLICATION>
     static void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -24,9 +21,9 @@ struct Interface
     static void OnMouseDown(GLFWwindow* window, int button, int action, int mods)
     { ((APPLICATION*)(app))->onMouseDown(button,action); }
 };
-///////////////////////////////////////////////////////////////////////////////
+
 void * Interface::app;
-///////////////////////////////////////////////////////////////////////////////
+
 class Window
 {
 public:
@@ -40,10 +37,12 @@ public:
     float ratio() { return (float)mWidth/mHeight;}
     
     Window() {}
+
+    ~Window() { destroy(); }
     
     template<class APPLICATION>
-    //-----------------------------------------------------------------------------
-    void create( APPLICATION * app, int w, int h, const char * name="10% Project" )
+
+    void create( APPLICATION * app, int w, int h, const char * name="OpenGL Globe" )
     {
         interface.app = app;
         mWidth = w; mHeight = h;
@@ -55,7 +54,7 @@ public:
             exit( EXIT_FAILURE );
         }
         glfwMakeContextCurrent( window );
-        glfwSwapInterval(1); //<-- force interval (not guaranteed to work with all graphics drivers)
+        glfwSwapInterval(1); // force interval (not guaranteed to work with all graphics drivers)
         
         //register callbacks for keyboard and mouse
         glfwSetKeyCallback( window, Interface::OnKeyDown<APPLICATION> );
@@ -63,20 +62,16 @@ public:
         glfwSetMouseButtonCallback( window, Interface::OnMouseDown<APPLICATION> );
         
     }
-    //-----------------------------------------------------------------------------
+
     void setViewport()
     {
         glfwGetFramebufferSize( window, &mWidth, &mHeight );
         glViewport( 0, 0, mWidth, mHeight );
     }
-    //-----------------------------------------------------------------------------
+    
     bool shouldClose() { return glfwWindowShouldClose( window ) == 1; }
-    //-----------------------------------------------------------------------------
+    
     void swapBuffers() { glfwSwapBuffers( window ); }
-    //-----------------------------------------------------------------------------
+  
     void destroy() { glfwDestroyWindow( window ); }
-    //-----------------------------------------------------------------------------
-    ~Window() { destroy(); }
-    //-----------------------------------------------------------------------------
 };
-///////////////////////////////////////////////////////////////////////////////

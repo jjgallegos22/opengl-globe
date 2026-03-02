@@ -2,14 +2,14 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 using namespace std;
-///////////////////////////////////////////////////////////////////////////////
+
 class Shader
 {
     GLuint sID;
     
 public:
     GLuint id() const { return sID; }
-    //-----------------------------------------------------------------------------
+
     Shader(const char * vert, const char * frag)
     {
         // 1. CREATE SHADER PROGRAM
@@ -35,11 +35,11 @@ public:
         // 8. USE PROGRAM
         glUseProgram( sID );
     }
-    //-----------------------------------------------------------------------------
+
     void bind(){ glUseProgram( sID ); }
-    //-----------------------------------------------------------------------------
+
     void unbind() { glUseProgram( 0 ); }
-    //-----------------------------------------------------------------------------
+
     void compilerCheck(GLuint ID)
     {
         GLint comp;
@@ -53,7 +53,7 @@ public:
             cout << messages;
         }
     }
-    //-----------------------------------------------------------------------------
+
     void linkCheck(GLuint ID)
     {
         GLint linkStatus, validateStatus;
@@ -79,6 +79,4 @@ public:
             cout << messages;
         }
     }
-    //-----------------------------------------------------------------------------
 };
-///////////////////////////////////////////////////////////////////////////////

@@ -1,6 +1,5 @@
 #include "App.hpp"
 #include "Shader.hpp"
-#include <math.h>
 #include <vector>
 #include <cmath>
 #include <fstream>
@@ -18,10 +17,9 @@
 #define SPHERE_STACKS          40
 #define SPHERE_SLICES          40
 #define SPHERE_TOTAL_VERTICES  SPHERE_STACKS * ( SPHERE_SLICES + 1 ) * 2
-///////////////////////////////////////////////////////////////////////////////
+
 const char * vert =  GLSL(120,
                           attribute vec3 position;
-                          attribute vec3 normal;
                           uniform mat4 model;
                           uniform mat4 view;
                           uniform mat4 projection;
@@ -38,16 +36,13 @@ const char * frag =  GLSL(120,
                           varying vec2 texCoord;
                           uniform sampler2D myTexture;
                           void main(){
-                              //gl_FragColor = vec4 (0.0, 1.0, 0.0, 1.0);
                               gl_FragColor = vec4(texture2D(myTexture, texCoord).rgb, 1.0);
                           }
                           );
-///////////////////////////////////////////////////////////////////////////////
+
 struct Vertex
 {
     glm::vec3 position;
-    glm::vec4 color;
-    glm::vec3 normal;
     glm::vec2 texture;
 };
 
@@ -63,7 +58,7 @@ struct Bitmap{
         load(FilePath);
     }
     
-    //adapted from http://stackoverflow.com/questions/20595340/loading-a-tga-bmp-file-in-c-opengl
+    // adapted from http://stackoverflow.com/questions/20595340/loading-a-tga-bmp-file-in-c-opengl
     void load(const char* FilePath)
     {
         std::fstream hFile;
@@ -84,7 +79,7 @@ struct Bitmap{
         std::vector<uint8_t> FileInfo(Length);
         hFile.read(reinterpret_cast<char*>(FileInfo.data()), 54);
         
-        if(FileInfo[0] != 'B' && FileInfo[1] != 'M')
+        if(FileInfo[0] != 'B' || FileInfo[1] != 'M')
         {
             hFile.close();
             throw std::invalid_argument("Error: Invalid File Format. Bitmap Required.");
@@ -110,21 +105,25 @@ struct Bitmap{
     
 };
 
-///////////////////////////////////////////////////////////////////////////////
 struct MyApp : public App
 {
     Shader* shader;
-    GLuint positionID, colorID, textureCoordinateID, normalID;
+    GLuint positionID, textureCoordinateID;
     GLuint mModelID, mProjectionID, mViewID;
-    GLuint vao, vbo;
+    GLuint vao, vbo, texID;
     Vertex mSphere[SPHERE_TOTAL_VERTICES];
 
     MyApp() { init(); }
     
+    ~MyApp()
+    {
+        delete shader;
+    }
+
     void init()
     {
         
-        Bitmap img("/Users/josegallegos/Documents/workspace/OpenGL/OpenGL/resources/earth.bmp");
+        Bitmap img("resources/earth.bmp");
         
         int tw = img.width;
         int th = img.height;
@@ -136,9 +135,7 @@ struct MyApp : public App
         shader = new Shader( vert, frag );
         shader->bind();
         positionID = glGetAttribLocation( shader->id(), "position" );
-        colorID = glGetAttribLocation( shader->id(), "color" );
         textureCoordinateID = glGetAttribLocation( shader->id(), "textureCoordinate" );
-        normalID = glGetAttribLocation( shader->id(), "normal");
         
         // Get uniform locations
         mModelID = glGetUniformLocation( shader->id(), "model" );
@@ -162,17 +159,13 @@ struct MyApp : public App
          *  ENABLE VERTEX ATTRIBUTES
          *-----------------------------------------------------------------------------*/
         glEnableVertexAttribArray(positionID);
-        glEnableVertexAttribArray(colorID);
         glEnableVertexAttribArray(textureCoordinateID);
-        glEnableVertexAttribArray(normalID);
-        
+
         // Tell OpenGL how to handle the buffer of data that is already on the GPU
         glVertexAttribPointer( positionID, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0 );
-        glVertexAttribPointer( colorID, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof( Vertex, color ) );
         glVertexAttribPointer( textureCoordinateID, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof( Vertex, texture ) );
-        glVertexAttribPointer( normalID, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof( Vertex, normal ) );
         
-        glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
+        glPolygonMode( GL_FRONT_AND_BACK, GL_FILL);
         
         glBindVertexArray(0);
         glBindBuffer( GL_ARRAY_BUFFER, 0 );
@@ -180,6 +173,8 @@ struct MyApp : public App
         /*-----------------------------------------------------------------------------
          *  Allocate Memory on the GPU
          *-----------------------------------------------------------------------------*/
+        glGenTextures( 1, &texID );
+        glBindTexture( GL_TEXTURE_2D, texID );
         glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, tw, th, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL );
         
         /*-----------------------------------------------------------------------------
@@ -188,10 +183,9 @@ struct MyApp : public App
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, tw, th, GL_BGR, GL_UNSIGNED_BYTE, img.pixels.data());
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
     }
-    //-----------------------------------------------------------------------------
     
     void createSphere(GLfloat fRadius, GLint iSlices, GLint iStacks)
     {
@@ -222,15 +216,13 @@ struct MyApp : public App
                 GLfloat z = crho;
                 
                 mSphere[vertexCount].texture = glm::vec2( s, t );
-                mSphere[vertexCount].normal = glm::vec3( x, y, z );
                 mSphere[vertexCount++].position = glm::vec3(x * fRadius, y * fRadius, z * fRadius);
-                
+
                 x = stheta * srhodrho;
                 y = ctheta * srhodrho;
                 z = crhodrho;
                 mSphere[vertexCount].texture = glm::vec2( s, t + dt );
                 s -= ds;
-                mSphere[vertexCount].normal = glm::vec3( x, y, z );
                 mSphere[vertexCount++].position = glm::vec3(x * fRadius, y * fRadius, z * fRadius);
             }
             
@@ -238,31 +230,23 @@ struct MyApp : public App
         }
     }
     
-    //-----------------------------------------------------------------------------
     void onDraw()
     {
         static float time = 0.0;
         glEnable( GL_TEXTURE_2D );
-        glTexEnvf( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE );
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
         glBindVertexArray( vao );
         
-        //time += 0.05f;
-        time += 0.005f;
+        time += 0.0005f;
         
         glm::mat4 view = glm::lookAt( glm::vec3( 0.0f, 0.0f, 2.0f ), glm::vec3( 0.0f, 0.0f, 0.0f ), glm::vec3( 0.0f, 1.0f, 0.0f ) );
         glUniformMatrix4fv( mViewID, 1, GL_FALSE, glm::value_ptr( view ) );
         
-        glm::mat4 projection = glm::perspective( glm::pi<float>() * 20.0f, DISPLAY_RATIO, 0.1f, -10.0f );
+        glm::mat4 projection = glm::perspective( glm::radians( 45.0f ), DISPLAY_RATIO, 0.1f, 10.0f );
         glUniformMatrix4fv( mProjectionID, 1, GL_FALSE, glm::value_ptr( projection ) );
         
-        glm::mat4 translate = glm::translate( glm::mat4(), glm::vec3( 0.0f, 0.0f, 0.0f ) );
-        glm::mat4 rotate = glm::rotate( glm::mat4(), glm::pi<float>() * 35, glm::vec3( 1.0f, .235f, 0.0f ) );
-        glm::mat4 rotate2 = glm::rotate( glm::mat4(), 2 * glm::pi<float>() * time, glm::vec3( 0.0f, 0.0f, 1.0f ) );
-        rotate *= rotate2;
-        glm::mat4 scale = glm::scale( glm::mat4(), glm::vec3( 1.0f ) );
-        glm::mat4 model = translate * rotate * scale;
+        glm::mat4 rotate = glm::rotate( glm::mat4(1.0f), glm::radians( 90.0f ), glm::vec3( 1.0f, 0.0f, 0.0f ) );
+        glm::mat4 rotate2 = glm::rotate( glm::mat4(1.0f), 2 * glm::pi<float>() * time, glm::vec3( 0.0f, 0.0f, 1.0f ) );
+        glm::mat4 model = rotate * rotate2;
         glUniformMatrix4fv( mModelID, 1, GL_FALSE, glm::value_ptr( model ) );
         
         glBindBuffer( GL_ARRAY_BUFFER, vbo );
@@ -272,10 +256,9 @@ struct MyApp : public App
         glBindVertexArray( 0 );
         glDisable( GL_TEXTURE_2D );
     }
-    //-----------------------------------------------------------------------------
+
     void onKeyDown( int key, int action )
     {
-        // do nothing
         if ( key == GLFW_KEY_1 )
         {
             glPolygonMode( GL_FRONT_AND_BACK, GL_POINT );
@@ -289,13 +272,11 @@ struct MyApp : public App
             glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
         }
     }
-    //-----------------------------------------------------------------------------
 };
-///////////////////////////////////////////////////////////////////////////////
+
 int main(int argc, const char ** argv)
 {
     MyApp app;
     app.start();
     return 0;
 }
-///////////////////////////////////////////////////////////////////////////////
